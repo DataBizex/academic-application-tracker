@@ -21,6 +21,12 @@ LEFT = Alignment(horizontal="left", vertical="center", wrap_text=True)
 thin = Side(style="thin", color="D0D4DC")
 BORDER = Border(left=thin, right=thin, top=thin, bottom=thin)
 fill = lambda c: PatternFill("solid", fgColor=c)
+LINK = f(9, True, "1565C0", underline="single")
+def back_link(ws, cell_ref, merge_to=None):
+    c = ws[cell_ref]; c.value = "◀ Back to Dashboard"; c.hyperlink = "#'Dashboard'!A1"; c.font = LINK
+    c.alignment = Alignment(horizontal="right", vertical="center")
+    if merge_to: ws.merge_cells(f"{cell_ref}:{merge_to}")
+
 
 wb = Workbook()
 wb.properties.creator = "ApplyAbroadLab.com"
@@ -82,7 +88,7 @@ UNIS = [
 ]
 banner(uni, 10)
 uni.cell(row=2, column=1, value="Reference table — one row per university / supervisor. Applications pull Country, Supervisor and Funding from here automatically.").font = f(9, italic=True, color=GRAY)
-uni.merge_cells("A2:J2")
+uni.merge_cells("A2:H2"); back_link(uni, "I2", "J2")
 header_row(uni, 3, ["University","Country","City","Research Area","Supervisor","Prestige (1-10)","Responsiveness (1-10)","Funding Type","Contact Status","Website"],
            [30,13,12,24,22,13,15,24,18,28])
 for r, row in enumerate(UNIS, start=4):
@@ -125,7 +131,7 @@ APPS = [
 ]
 banner(app, 16)
 app.cell(row=2, column=1, value="Main tracker — edit the white columns. Grey columns (Country, Supervisor, Funding, Days Until Deadline) are calculated automatically.").font = f(9, italic=True, color=GRAY)
-app.merge_cells("A2:P2")
+app.merge_cells("A2:N2"); back_link(app, "O2", "P2")
 H = ["ID","University","Country","Program","Field","Level","Supervisor","Deadline","Days Until Deadline","Status","Priority",
      "Research Fit (1-10)","Funding Type","Documents Ready (%)","Last Contact","Notes","Upcoming Key","Match Index"]
 W = [6,30,13,30,20,10,22,13,12,13,10,11,24,12,13,40,10,10]
@@ -137,7 +143,7 @@ for i, row in enumerate(APPS):
     r = A_FIRST + i
     uname, prog, field, level, dl, status, prio, fit, docs, last, notes = row
     vals = {1: i+1, 2: uname, 3: f'=IFERROR(INDEX({ucol("B")},MATCH(B{r},{UR},0)),"")', 4: prog, 5: field, 6: level,
-            7: f'=IFERROR(INDEX({ucol("E")},MATCH(B{r},{UR},0)),"")', 8: dl, 9: f'=IF(H{r}="","",H{r}-TODAY())',
+            7: f'=IFERROR(HYPERLINK("#\'Universities & Supervisors\'!A"&(MATCH(B{r},{UR},0)+{U_FIRST-1}),INDEX({ucol("E")},MATCH(B{r},{UR},0))),"")', 8: dl, 9: f'=IF(H{r}="","",H{r}-TODAY())',
             10: status, 11: prio, 12: fit, 13: f'=IFERROR(INDEX({ucol("H")},MATCH(B{r},{UR},0)),"")', 14: docs/100,
             15: last, 16: notes,
             17: f'=IF(AND(I{r}<>"",I{r}>=0,I{r}<=30),I{r}+ROW()/100000,"")',
@@ -147,6 +153,7 @@ for i, row in enumerate(APPS):
         cell.font = f(); cell.border = BORDER
         cell.alignment = LEFT if c in (4, 16) else CENTER
         if c in (3, 7, 9, 13): cell.fill = fill(LIGHT)
+        if c == 7: cell.font = f(10, color="1565C0", underline="single")
         if c == 8 or c == 15: cell.number_format = "dd-mmm-yyyy"
         if c == 14: cell.number_format = "0%"
     app.row_dimensions[r].height = 20
@@ -179,7 +186,7 @@ app.auto_filter.ref = f"A3:P{A_LAST}"
 sc = wb.create_sheet("Scoring")
 banner(sc, 8)
 sc.cell(row=2, column=1, value="Shortlist comparison — pick up to 4 universities in the yellow cells. All axes are normalised to 0-10 so the radar shape is comparable.").font = f(9, italic=True, color=GRAY)
-sc.merge_cells("A2:H2")
+sc.merge_cells("A2:E2"); back_link(sc, "G2", "H2")
 header_row(sc, 3, ["Axis","Shortlist 1","Shortlist 2","Shortlist 3","Shortlist 4","","Scoring rule",""], [26,26,26,26,26,3,60,3])
 sc.merge_cells("G3:H3")
 picks = ["Technical University of Munich","Karolinska Institutet","University of Bologna","ETH Zurich"]
@@ -206,18 +213,22 @@ for i, (name, fn, rule) in enumerate(axes, start=5):
 t = sc.cell(row=10, column=1, value="Overall (average)"); t.font = f(10, True); t.alignment = CENTER; t.border = BORDER; t.fill = fill(NAVY); t.font = f(10, True, WHITE)
 for j, L in enumerate("BCDE", start=2):
     c = sc.cell(row=10, column=j, value=f"=ROUND(AVERAGE({L}5:{L}9),1)"); c.font = f(10, True); c.alignment = CENTER; c.border = BORDER; c.fill = fill(MID)
+o = sc.cell(row=11, column=1, value="Open university record"); o.font = f(9, color=GRAY); o.alignment = CENTER; o.border = BORDER
+for j, L in enumerate("BCDE", start=2):
+    c = sc.cell(row=11, column=j, value=f'=IF({L}4="","",HYPERLINK("#\'Universities & Supervisors\'!A"&(MATCH({L}4,{UR},0)+{U_FIRST-1}),"Open ▸"))')
+    c.font = LINK; c.alignment = CENTER; c.border = BORDER
 radar = RadarChart(); radar.type = "filled"; radar.style = 26; radar.title = "Shortlist comparison (0-10)"
 radar.add_data(Reference(sc, min_col=2, max_col=5, min_row=4, max_row=9), titles_from_data=True)
 radar.set_categories(Reference(sc, min_col=1, min_row=5, max_row=9))
 radar.y_axis.scaling.min = 0; radar.y_axis.scaling.max = 10
 radar.height = 10; radar.width = 18
-sc.add_chart(radar, "A13")
+sc.add_chart(radar, "A14")
 
 # ------------------------------------------------------------------ Explorer
 ex = wb.create_sheet("Explorer")
 banner(ex, 8)
 ex.cell(row=2, column=1, value="Interactive filter — change the three yellow selectors and the list, KPIs and chart update instantly.").font = f(9, italic=True, color=GRAY)
-ex.merge_cells("A2:H2")
+ex.merge_cells("A2:F2"); back_link(ex, "G2", "H2")
 for r, (lab, key) in enumerate([("Country","B"), ("Status","A"), ("Priority","B")], start=4):
     l = ex.cell(row=r, column=2, value=lab); l.font = f(10, True); l.alignment = CENTER; l.border = BORDER; l.fill = fill(MID)
     v = ex.cell(row=r, column=3, value="All"); v.font = f(10, True); v.alignment = CENTER; v.border = BORDER; v.fill = fill("FFF9C4")
@@ -249,10 +260,14 @@ for n in range(1, 21):
     ex.cell(row=r, column=1, value=n)
     src = {2:"B",3:"C",4:"D",5:"H",6:"I",7:"J",8:"K"}
     for c, col in src.items():
-        ex.cell(row=r, column=c, value=f'=IFERROR(INDEX(Applications!${col}${A_FIRST}:${col}${A_LAST},MATCH($A{r},Applications!$R${A_FIRST}:$R${A_LAST},0)),"")')
+        if c == 2:
+            ex.cell(row=r, column=c, value=f'=IFERROR(HYPERLINK("#\'Applications\'!A"&(MATCH($A{r},Applications!$R${A_FIRST}:$R${A_LAST},0)+{A_FIRST-1}),INDEX(Applications!$B${A_FIRST}:$B${A_LAST},MATCH($A{r},Applications!$R${A_FIRST}:$R${A_LAST},0))),"")')
+        else:
+            ex.cell(row=r, column=c, value=f'=IFERROR(INDEX(Applications!${col}${A_FIRST}:${col}${A_LAST},MATCH($A{r},Applications!$R${A_FIRST}:$R${A_LAST},0)),"")')
     for c in range(1, 9):
         cell = ex.cell(row=r, column=c); cell.font = f(); cell.border = BORDER
         cell.alignment = LEFT if c == 4 else CENTER
+    ex.cell(row=r, column=2).font = f(10, color="1565C0", underline="single")
     ex.cell(row=r, column=5).number_format = "dd-mmm-yyyy"
     ex.row_dimensions[r].height = 18
 ex.conditional_formatting.add("F10:F29", CellIsRule(operator="between", formula=["0","30"], font=Font(color="C62828", bold=True)))
@@ -298,22 +313,23 @@ for i, (lab, fo, nf) in enumerate(kpis):
     l = db.cell(row=5, column=c1, value=lab); l.font = f(9, True, GRAY); l.alignment = CENTER; l.fill = fill(LIGHT)
     v = db.cell(row=6, column=c1, value=fo); v.font = f(24, True, NAVY); v.alignment = CENTER; v.fill = fill(LIGHT)
     if nf: v.number_format = nf
+    v.hyperlink = "#'Applications'!A4"; v.font = f(24, True, NAVY, underline="single")
     for cc in (c1, c2):
         db.cell(row=5, column=cc).border = BORDER; db.cell(row=6, column=cc).border = BORDER
 db.row_dimensions[5].height = 22; db.row_dimensions[6].height = 46
-db["D6"].font = f(24, True, TEAL)
+db["D6"].font = f(24, True, TEAL, underline="single")
 # chart data helper block (columns O:R)
 db["O4"] = "Chart data (auto)"; db["O4"].font = f(9, True, GRAY)
 db["O5"] = "Status"; db["P5"] = "Count"
 for i, st in enumerate(STATUS, start=6):
-    db.cell(row=i, column=15, value=st); db.cell(row=i, column=16, value=f'=COUNTIF({AJ},"{st}")')
+    lc = db.cell(row=i, column=15, value=st); lc.hyperlink = "#'Applications'!J4"; db.cell(row=i, column=16, value=f'=COUNTIF({AJ},"{st}")')
 db["O13"] = "Country"; db["P13"] = "Count"
 AC = f"Applications!$C${A_FIRST}:$C${A_LAST}"
 for i, co in enumerate(countries[1:], start=14):
-    db.cell(row=i, column=15, value=co); db.cell(row=i, column=16, value=f'=COUNTIF({AC},"{co}")')
+    lc = db.cell(row=i, column=15, value=co); lc.hyperlink = "#'Applications'!C4"; db.cell(row=i, column=16, value=f'=COUNTIF({AC},"{co}")')
 for r in range(5, 14+len(countries)):
     for c in (15, 16):
-        db.cell(row=r, column=c).font = f(9, color=GRAY); db.cell(row=r, column=c).alignment = CENTER
+        db.cell(row=r, column=c).font = f(9, color=GRAY, underline=("single" if c == 15 and db.cell(row=r, column=c).hyperlink else None)); db.cell(row=r, column=c).alignment = CENTER
 db.column_dimensions["O"].width = 14; db.column_dimensions["P"].width = 8
 # section header
 for col, title in [(2, "APPLICATION STATUS"), (6, "APPLICATIONS BY COUNTRY"), (10, "SHORTLIST COMPARISON")]:
@@ -354,7 +370,7 @@ for n in range(1, 7):
     r = 28 + n
     db.cell(row=r, column=2, value=n)
     key = f'SMALL({AQ},{n})'
-    db.cell(row=r, column=3, value=f'=IFERROR(INDEX({AB},MATCH({key},{AQ},0)),"")')
+    db.cell(row=r, column=3, value=f'=IFERROR(HYPERLINK("#\'Applications\'!A"&(MATCH({key},{AQ},0)+{A_FIRST-1}),INDEX({AB},MATCH({key},{AQ},0))),"")')
     db.cell(row=r, column=5, value=f'=IFERROR(INDEX(Applications!$D${A_FIRST}:$D${A_LAST},MATCH({key},{AQ},0)),"")')
     db.cell(row=r, column=7, value=f'=IFERROR(INDEX(Applications!$H${A_FIRST}:$H${A_LAST},MATCH({key},{AQ},0)),"")')
     db.cell(row=r, column=8, value=f'=IFERROR(INDEX({AI},MATCH({key},{AQ},0)),"")')
@@ -363,6 +379,7 @@ for n in range(1, 7):
         cell = db.cell(row=r, column=c); cell.font = f(9); cell.border = BORDER
         cell.alignment = LEFT if c in (3, 5) else CENTER
     db.cell(row=r, column=7).number_format = "dd-mmm-yyyy"
+    db.cell(row=r, column=3).font = f(9, color="1565C0", underline="single")
     db.row_dimensions[r].height = 18
 db.conditional_formatting.add("H29:H34", CellIsRule(operator="between", formula=["0","30"], font=Font(color="C62828", bold=True)))
 db.conditional_formatting.add("B29:H34", FormulaRule(formula=['$C29=""'], font=Font(color="FFFFFF"), border=Border()))
@@ -377,7 +394,7 @@ for i, (lab, sheet) in enumerate(nav):
     c.hyperlink = f"#'{sheet}'!A1"; c.font = f(10, True, WHITE, underline="single"); c.fill = fill(NAVY); c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     db.row_dimensions[r].height = 18
 # footer
-db.merge_cells("B36:M36"); db["B36"] = "Tip: update Status, Priority and Deadline in the Applications sheet — every KPI, chart and list on this page recalculates automatically."
+db.merge_cells("B36:M36"); db["B36"] = "Tip: every underlined number or name on this page is a link — one click opens the source row. If a linked cell is already selected, a second click enters edit mode; press Esc to leave it."
 db["B36"].font = f(9, italic=True, color=GRAY)
 db.merge_cells("B38:M38"); db["B38"] = "CONNECT WITH APPLY ABROAD LAB"; db["B38"].font = f(10, True, NAVY)
 foot = [("Website:", "https://applyabroadlab.com/", "https://applyabroadlab.com/"),
@@ -407,11 +424,14 @@ rows = [
  ("Filtering", "Open Explorer and change Country, Status or Priority. The matching list, the selection KPIs and the status chart update instantly. Set a selector back to All to clear it."),
  ("Data quality rules", "Status, Priority, Level, Field and University are dropdown-only, Research Fit accepts 1-10 only. This keeps every chart and KPI reliable."),
  ("Before recording a demo", "Deadlines are fixed dates. If you record later, shift a few deadlines into the next 30 days so the Upcoming Deadlines list and the red alerts are visible."),
+ ("Navigation & links", "Underlined numbers and names are links. One click on a link opens the source row (KPI cards and chart-data labels open the Applications sheet; deadline and Explorer rows open the exact application; Scoring and the Supervisor column open the university record). Every sheet has a Back to Dashboard link at the top right. Excel rule: if a linked cell is already the selected cell, clicking it again enters edit mode instead of following the link — press Esc, click any other cell, then click the link once."),
  ("Built with", "Python (openpyxl) generating native Excel formulas, validation, conditional formatting and chart objects. No macros, no external connections, works offline in Excel 2016 or later."),
 ]
-hw["B3"] = "How It Works"; hw["B3"].font = f(16, True, NAVY)
+hw["B3"] = "How It Works"; hw["B3"].font = f(16, True, NAVY); back_link(hw, "C3")
 for i, (k, v) in enumerate(rows, start=5):
-    a = hw.cell(row=i, column=2, value=k); a.font = f(10, True, NAVY); a.alignment = Alignment(horizontal="left", vertical="top"); a.fill = fill(MID); a.border = BORDER
+    a = hw.cell(row=i, column=2, value=k); a.font = f(10, True, NAVY)
+    target = {"Adding an application":"Applications","Adding a university":"Universities & Supervisors","Comparing a shortlist":"Scoring","Filtering":"Explorer","What is automated":"Dashboard","Data model":"Applications"}.get(k)
+    if target: a.hyperlink = f"#'{target}'!A1"; a.font = f(10, True, "1565C0", underline="single"); a.alignment = Alignment(horizontal="left", vertical="top"); a.fill = fill(MID); a.border = BORDER
     b = hw.cell(row=i, column=3, value=v); b.font = f(10); b.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True); b.border = BORDER
     hw.row_dimensions[i].height = 48
 hw.sheet_view.showGridLines = False
